@@ -20,87 +20,137 @@ use Illuminate\Support\Facades\Route;
 |
 | Prefix  : /api
 | Auth    : Laravel Sanctum (Bearer Token)
+| RBAC    : Middleware 'role' (EnsureRole) — role:super_admin,teacher,student
 |
-| Struktur:
-|   [Public]    POST   /api/auth/register
-|   [Public]    POST   /api/auth/login
-|   [Auth]      POST   /api/auth/logout
-|   [Auth]      GET    /api/auth/me
-|
-|   [Auth]      GET|POST              /api/categories
-|   [Auth]      GET|PUT|DELETE        /api/categories/{category}
-|
-|   [Auth]      GET|POST              /api/courses
-|   [Auth]      GET|PUT|DELETE        /api/courses/{course}
-|
-|   [Auth]      GET|POST              /api/courses/{course}/modules
-|   [Auth]      GET|PUT|DELETE        /api/courses/{course}/modules/{module}
-|
-|   [Auth]      GET|POST              /api/courses/{course}/modules/{module}/materials
-|   [Auth]      GET|PUT|DELETE        /api/courses/{course}/modules/{module}/materials/{material}
+| ┌─────────────────────────────────────────────────────────────────────┐
+| │ [Public]       POST  /api/auth/register                             │
+| │ [Public]       POST  /api/auth/login                                │
+| ├─────────────────────────────────────────────────────────────────────┤
+| │ [All Auth]     POST  /api/auth/logout                               │
+| │ [All Auth]     GET   /api/auth/me                                   │
+| │ [All Auth]     GET   /api/categories                                │
+| │ [All Auth]     GET   /api/courses                                   │
+| │ [All Auth]     GET   /api/courses/{course}                          │
+| │ [All Auth]     GET   /api/badges                                    │
+| ├─────────────────────────────────────────────────────────────────────┤
+| │ [Admin+Teacher] CRUD  /api/categories                               │
+| │ [Admin+Teacher] CRUD  /api/courses                                  │
+| │ [Admin+Teacher] CRUD  /api/modules                                  │
+| │ [Admin+Teacher] CRUD  /api/materials                                │
+| │ [Admin+Teacher] CRUD  /api/quizzes & /api/questions                 │
+| │ [Admin+Teacher] GET   /api/courses/{course}/students                │
+| │ [Admin+Teacher] CRUD  /api/badges                                   │
+| ├─────────────────────────────────────────────────────────────────────┤
+| │ [Student Only] POST   /api/courses/{course}/enroll                  │
+| │ [Student Only] DELETE /api/courses/{course}/enroll                  │
+| │ [Student Only] GET    /api/my-courses                               │
+| │ [Student Only] GET    /api/my-progress                              │
+| │ [Student Only] POST   /api/materials/{material}/progress            │
+| │ [Student Only] POST   /api/quizzes/{quiz}/submit                    │
+| │ [Student Only] GET    /api/my-attempts                              │
+| │ [Student Only] GET    /api/my-badges                                │
+| └─────────────────────────────────────────────────────────────────────┘
 |
 */
 
-// ─── Public Routes (Tidak perlu login) ──────────────────────────────────────
+// ─── [PUBLIC] Tidak perlu login ──────────────────────────────────────────────
 Route::prefix('auth')->name('auth.')->group(function () {
     Route::post('register', [AuthController::class, 'register'])->name('register');
     Route::post('login',    [AuthController::class, 'login'])->name('login');
 });
 
-// ─── Protected Routes (Perlu Bearer Token) ──────────────────────────────────
+// ─── [PROTECTED] Perlu Bearer Token ─────────────────────────────────────────
 Route::middleware('auth:sanctum')->group(function () {
 
-    // --- Auth ---
+    // ── [All Roles] Auth utility ─────────────────────────────────────────────
     Route::prefix('auth')->name('auth.')->group(function () {
         Route::post('logout', [AuthController::class, 'logout'])->name('logout');
         Route::get('me',      [AuthController::class, 'me'])->name('me');
     });
 
-    // --- Categories ---
-    Route::apiResource('categories', CategoryController::class);
+    // ── [All Roles] Baca kategori & kelas ────────────────────────────────────
+    Route::get('categories',        [CategoryController::class, 'index'])->name('categories.index');
+    Route::get('categories/{category}', [CategoryController::class, 'show'])->name('categories.show');
+    Route::get('courses',           [CourseController::class, 'index'])->name('courses.index');
+    Route::get('courses/{course}',  [CourseController::class, 'show'])->name('courses.show');
+    Route::get('badges',            [BadgeController::class, 'index'])->name('badges.index');
+    Route::get('badges/{badge}',    [BadgeController::class, 'show'])->name('badges.show');
 
-    // --- Courses ---
-    Route::apiResource('courses', CourseController::class);
+    // ── [Admin + Teacher] Kelola konten ──────────────────────────────────────
+    Route::middleware('role:super_admin,teacher')->group(function () {
 
-    // --- Modules (nested dalam Course) ---
-    Route::apiResource('courses.modules', ModuleController::class)
-        ->shallow();
+        // Categories — hanya super admin & teacher yang bisa CRUD
+        Route::post('categories',                [CategoryController::class, 'store'])->name('categories.store');
+        Route::put('categories/{category}',      [CategoryController::class, 'update'])->name('categories.update');
+        Route::delete('categories/{category}',   [CategoryController::class, 'destroy'])->name('categories.destroy');
 
-    // --- Materials (nested dalam Module) ---
-    Route::apiResource('courses.modules.materials', MaterialController::class)
-        ->shallow();
+        // Courses — create, update, delete
+        Route::post('courses',                   [CourseController::class, 'store'])->name('courses.store');
+        Route::put('courses/{course}',           [CourseController::class, 'update'])->name('courses.update');
+        Route::delete('courses/{course}',        [CourseController::class, 'destroy'])->name('courses.destroy');
 
-    // --- Enrollment (Pendaftaran Kelas) ---
-    Route::get('my-courses', [EnrollmentController::class, 'myCourses'])->name('my-courses');
-    Route::post('courses/{course}/enroll', [EnrollmentController::class, 'enroll'])->name('courses.enroll');
-    Route::delete('courses/{course}/enroll', [EnrollmentController::class, 'unenroll'])->name('courses.unenroll');
-    Route::get('courses/{course}/students', [EnrollmentController::class, 'courseStudents'])->name('courses.students');
+        // Modules — nested di course (shallow: update/delete langsung via /modules/{module})
+        Route::apiResource('courses.modules', ModuleController::class)
+            ->except(['index', 'show'])
+            ->shallow();
 
-    // --- Progress Belajar ---
-    Route::get('my-progress', [ProgressController::class, 'myProgress'])->name('my-progress');
-    Route::post('materials/{material}/progress', [ProgressController::class, 'markProgress'])->name('materials.progress');
-    Route::get('courses/{course}/progress', [ProgressController::class, 'courseProgress'])->name('courses.progress');
+        // GET modules (baca oleh semua login — dipindah ke All Roles)
+        // Materials — nested di module (shallow)
+        Route::apiResource('courses.modules.materials', MaterialController::class)
+            ->except(['index', 'show'])
+            ->shallow();
 
-    // --- Gamifikasi: Quiz ---
-    Route::get('courses/{course}/quizzes', [QuizController::class, 'index'])->name('courses.quizzes.index');
-    Route::post('courses/{course}/quizzes', [QuizController::class, 'store'])->name('courses.quizzes.store');
-    Route::get('quizzes/{quiz}', [QuizController::class, 'show'])->name('quizzes.show');
-    Route::put('quizzes/{quiz}', [QuizController::class, 'update'])->name('quizzes.update');
-    Route::delete('quizzes/{quiz}', [QuizController::class, 'destroy'])->name('quizzes.destroy');
+        // List siswa per kelas
+        Route::get('courses/{course}/students', [EnrollmentController::class, 'courseStudents'])
+            ->name('courses.students');
 
-    // --- Gamifikasi: Questions (soal kuis) ---
-    Route::get('quizzes/{quiz}/questions', [QuestionController::class, 'index'])->name('quizzes.questions.index');
-    Route::post('quizzes/{quiz}/questions', [QuestionController::class, 'store'])->name('quizzes.questions.store');
-    Route::get('questions/{question}', [QuestionController::class, 'show'])->name('questions.show');
-    Route::put('questions/{question}', [QuestionController::class, 'update'])->name('questions.update');
-    Route::delete('questions/{question}', [QuestionController::class, 'destroy'])->name('questions.destroy');
+        // Quizzes — CRUD oleh teacher/admin
+        Route::get('courses/{course}/quizzes',  [QuizController::class, 'index'])->name('courses.quizzes.index');
+        Route::post('courses/{course}/quizzes', [QuizController::class, 'store'])->name('courses.quizzes.store');
+        Route::put('quizzes/{quiz}',            [QuizController::class, 'update'])->name('quizzes.update');
+        Route::delete('quizzes/{quiz}',         [QuizController::class, 'destroy'])->name('quizzes.destroy');
 
-    // --- Gamifikasi: Quiz Attempts (submit & riwayat nilai) ---
-    Route::post('quizzes/{quiz}/submit', [QuizAttemptController::class, 'submit'])->name('quizzes.submit');
-    Route::get('quizzes/{quiz}/attempts', [QuizAttemptController::class, 'quizAttempts'])->name('quizzes.attempts');
-    Route::get('my-attempts', [QuizAttemptController::class, 'myAttempts'])->name('my-attempts');
+        // Questions — CRUD oleh teacher/admin
+        Route::get('quizzes/{quiz}/questions',  [QuestionController::class, 'index'])->name('quizzes.questions.index');
+        Route::post('quizzes/{quiz}/questions', [QuestionController::class, 'store'])->name('quizzes.questions.store');
+        Route::put('questions/{question}',      [QuestionController::class, 'update'])->name('questions.update');
+        Route::delete('questions/{question}',   [QuestionController::class, 'destroy'])->name('questions.destroy');
 
-    // --- Gamifikasi: Badges ---
-    Route::apiResource('badges', BadgeController::class);
-    Route::get('my-badges', [BadgeController::class, 'myBadges'])->name('my-badges');
+        // Badges — CRUD oleh teacher/admin
+        Route::post('badges',           [BadgeController::class, 'store'])->name('badges.store');
+        Route::put('badges/{badge}',    [BadgeController::class, 'update'])->name('badges.update');
+        Route::delete('badges/{badge}', [BadgeController::class, 'destroy'])->name('badges.destroy');
+    });
+
+    // ── [All Auth] Baca modul & materi (teacher perlu lihat juga) ────────────
+    Route::get('courses/{course}/modules',                               [ModuleController::class, 'index'])->name('courses.modules.index');
+    Route::get('modules/{module}',                                       [ModuleController::class, 'show'])->name('modules.show');
+    Route::get('courses/{course}/modules/{module}/materials',            [MaterialController::class, 'index'])->name('courses.modules.materials.index');
+    Route::get('materials/{material}',                                   [MaterialController::class, 'show'])->name('materials.show');
+    Route::get('quizzes/{quiz}',                                         [QuizController::class, 'show'])->name('quizzes.show');
+    Route::get('questions/{question}',                                   [QuestionController::class, 'show'])->name('questions.show');
+
+    // ── [Student Only] Enrollment & aktivitas belajar ────────────────────────
+    Route::middleware('role:student')->group(function () {
+
+        // Enrollment
+        Route::post('courses/{course}/enroll',   [EnrollmentController::class, 'enroll'])->name('courses.enroll');
+        Route::delete('courses/{course}/enroll', [EnrollmentController::class, 'unenroll'])->name('courses.unenroll');
+        Route::get('my-courses',                 [EnrollmentController::class, 'myCourses'])->name('my-courses');
+
+        // Progress belajar
+        Route::get('my-progress',                            [ProgressController::class, 'myProgress'])->name('my-progress');
+        Route::post('materials/{material}/progress',         [ProgressController::class, 'markProgress'])->name('materials.progress');
+        Route::get('courses/{course}/progress',              [ProgressController::class, 'courseProgress'])->name('courses.progress');
+
+        // Quiz attempts (submit & riwayat nilai)
+        Route::post('quizzes/{quiz}/submit', [QuizAttemptController::class, 'submit'])->name('quizzes.submit');
+        Route::get('quizzes/{quiz}/attempts',[QuizAttemptController::class, 'quizAttempts'])->name('quizzes.attempts');
+        Route::get('my-attempts',            [QuizAttemptController::class, 'myAttempts'])->name('my-attempts');
+
+        // Badge milik siswa
+        Route::get('my-badges', [BadgeController::class, 'myBadges'])->name('my-badges');
+    });
 });
+
+
