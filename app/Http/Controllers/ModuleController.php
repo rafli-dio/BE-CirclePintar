@@ -11,6 +11,7 @@ class ModuleController extends Controller
 {
     /**
      * Tampilkan semua modul dalam sebuah kelas, diurutkan by order_number.
+     * Semua role yang sudah login bisa mengakses.
      */
     public function index(Course $course): JsonResponse
     {
@@ -24,9 +25,12 @@ class ModuleController extends Controller
 
     /**
      * Tambah modul baru ke dalam sebuah kelas.
+     * Hanya guru pemilik kelas atau super admin.
      */
     public function store(Request $request, Course $course): JsonResponse
     {
+        $this->authorize('addModule', $course);
+
         $validated = $request->validate([
             'title'        => ['required', 'string', 'max:255'],
             'order_number' => ['required', 'integer', 'min:1'],
@@ -44,8 +48,9 @@ class ModuleController extends Controller
 
     /**
      * Tampilkan detail satu modul beserta materi-nya.
+     * Semua role yang sudah login bisa mengakses.
      */
-    public function show(Course $course, Module $module): JsonResponse
+    public function show(Module $module): JsonResponse
     {
         $module->load('materials');
 
@@ -57,9 +62,12 @@ class ModuleController extends Controller
 
     /**
      * Perbarui data modul.
+     * Hanya guru pemilik kelas induk atau super admin.
      */
-    public function update(Request $request, Course $course, Module $module): JsonResponse
+    public function update(Request $request, Module $module): JsonResponse
     {
+        $this->authorize('update', $module);
+
         $validated = $request->validate([
             'title'        => ['sometimes', 'string', 'max:255'],
             'order_number' => ['sometimes', 'integer', 'min:1'],
@@ -75,9 +83,12 @@ class ModuleController extends Controller
 
     /**
      * Hapus modul (cascade ke materials).
+     * Hanya guru pemilik kelas induk atau super admin.
      */
-    public function destroy(Course $course, Module $module): JsonResponse
+    public function destroy(Module $module): JsonResponse
     {
+        $this->authorize('delete', $module);
+
         $module->delete();
 
         return response()->json([

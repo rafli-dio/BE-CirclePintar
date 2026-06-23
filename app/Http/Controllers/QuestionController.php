@@ -27,11 +27,14 @@ class QuestionController extends Controller
 
     /**
      * Tambah soal baru ke dalam kuis.
+     * Hanya guru pemilik kelas induk atau super admin.
      *
      * POST /api/quizzes/{quiz}/questions
      */
     public function store(Request $request, Quiz $quiz): JsonResponse
     {
+        $this->authorize('addQuestion', $quiz);
+
         $validated = $request->validate([
             'question'    => ['required', 'string'],
             'option_a'    => ['required', 'string', 'max:255'],
@@ -66,11 +69,14 @@ class QuestionController extends Controller
 
     /**
      * Perbarui data soal.
+     * Hanya guru pemilik kelas induk atau super admin.
      *
      * PUT /api/questions/{question}
      */
     public function update(Request $request, Question $question): JsonResponse
     {
+        $this->authorize('update', $question);
+
         $validated = $request->validate([
             'question'    => ['sometimes', 'string'],
             'option_a'    => ['sometimes', 'string', 'max:255'],
@@ -90,11 +96,14 @@ class QuestionController extends Controller
 
     /**
      * Hapus soal.
+     * Hanya guru pemilik kelas induk atau super admin.
      *
      * DELETE /api/questions/{question}
      */
     public function destroy(Question $question): JsonResponse
     {
+        $this->authorize('delete', $question);
+
         $question->delete();
 
         return response()->json([

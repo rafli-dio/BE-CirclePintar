@@ -10,6 +10,7 @@ class CourseController extends Controller
 {
     /**
      * Tampilkan daftar semua kelas beserta relasi teacher & category.
+     * Semua role yang sudah login bisa mengakses.
      */
     public function index(): JsonResponse
     {
@@ -25,9 +26,12 @@ class CourseController extends Controller
 
     /**
      * Simpan kelas baru.
+     * Hanya teacher/super_admin (sudah dibatasi middleware).
      */
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', Course::class);
+
         $validated = $request->validate([
             'category_id' => ['required', 'exists:categories,id'],
             'title'       => ['required', 'string', 'max:255'],
@@ -48,6 +52,7 @@ class CourseController extends Controller
 
     /**
      * Tampilkan detail satu kelas beserta modul dan materi-nya.
+     * Semua role yang sudah login bisa mengakses.
      */
     public function show(Course $course): JsonResponse
     {
@@ -65,9 +70,12 @@ class CourseController extends Controller
 
     /**
      * Perbarui data kelas.
+     * Hanya guru pemilik kelas atau super admin.
      */
     public function update(Request $request, Course $course): JsonResponse
     {
+        $this->authorize('update', $course);
+
         $validated = $request->validate([
             'category_id' => ['sometimes', 'exists:categories,id'],
             'title'       => ['sometimes', 'string', 'max:255'],
@@ -85,9 +93,12 @@ class CourseController extends Controller
 
     /**
      * Hapus kelas (cascade ke modules & materials).
+     * Hanya guru pemilik kelas atau super admin.
      */
     public function destroy(Course $course): JsonResponse
     {
+        $this->authorize('delete', $course);
+
         $course->delete();
 
         return response()->json([

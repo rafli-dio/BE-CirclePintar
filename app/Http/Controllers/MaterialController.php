@@ -40,16 +40,23 @@ class MaterialController extends Controller
     /**
      * Tambah materi baru ke dalam sebuah modul.
      * Hanya guru pemilik kelas induk atau super admin.
+<<<<<<< HEAD
      *
      * Mendukung dua mode:
      *  1. Upload PDF  → kirim sebagai multipart/form-data dengan field `file`
      *  2. URL eksternal → kirim JSON dengan field `content_url` (video/text)
+=======
+>>>>>>> bd8073d52c4396dbf2501d5e9ffabfe4ef835935
      */
     public function store(Request $request, Module $module): JsonResponse
     {
         $this->authorize('addMaterial', $module);
 
+<<<<<<< HEAD
         $request->validate([
+=======
+        $validated = $request->validate([
+>>>>>>> bd8073d52c4396dbf2501d5e9ffabfe4ef835935
             'title'        => ['required', 'string', 'max:255'],
             'type'         => ['required', 'in:video,pdf,text'],
             'order_number' => ['required', 'integer', 'min:1'],
@@ -112,15 +119,22 @@ class MaterialController extends Controller
     /**
      * Perbarui data materi.
      * Hanya guru pemilik kelas induk atau super admin.
+<<<<<<< HEAD
      *
      * Jika request mengandung file PDF baru → hapus file lama, upload baru.
      * Jika tidak ada file → hanya update metadata (title, order_number, dsb.).
+=======
+>>>>>>> bd8073d52c4396dbf2501d5e9ffabfe4ef835935
      */
     public function update(Request $request, Material $material): JsonResponse
     {
         $this->authorize('update', $material);
 
+<<<<<<< HEAD
         $request->validate([
+=======
+        $validated = $request->validate([
+>>>>>>> bd8073d52c4396dbf2501d5e9ffabfe4ef835935
             'title'        => ['sometimes', 'string', 'max:255'],
             'type'         => ['sometimes', 'in:video,pdf,text'],
             'order_number' => ['sometimes', 'integer', 'min:1'],
@@ -174,9 +188,14 @@ class MaterialController extends Controller
     // ─── Destroy ──────────────────────────────────────────────────────────────────
 
     /**
+<<<<<<< HEAD
      * Hapus materi beserta file-nya dari storage (jika ada).
      * Hanya guru pemilik kelas induk atau super admin.
      * File dihapus otomatis oleh event `deleting` di Model.
+=======
+     * Hapus materi.
+     * Hanya guru pemilik kelas induk atau super admin.
+>>>>>>> bd8073d52c4396dbf2501d5e9ffabfe4ef835935
      */
     public function destroy(Material $material): JsonResponse
     {
