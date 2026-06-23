@@ -11,6 +11,7 @@ class QuizController extends Controller
 {
     /**
      * Tampilkan semua kuis dalam sebuah kelas.
+     * Hanya admin/teacher (sudah dibatasi middleware).
      *
      * GET /api/courses/{course}/quizzes
      */
@@ -29,11 +30,14 @@ class QuizController extends Controller
 
     /**
      * Buat kuis baru di dalam sebuah kelas.
+     * Hanya guru pemilik kelas atau super admin.
      *
      * POST /api/courses/{course}/quizzes
      */
     public function store(Request $request, Course $course): JsonResponse
     {
+        $this->authorize('addQuiz', $course);
+
         $validated = $request->validate([
             'title'      => ['required', 'string', 'max:255'],
             'time_limit' => ['required', 'integer', 'min:1', 'max:300'],
@@ -68,11 +72,14 @@ class QuizController extends Controller
 
     /**
      * Perbarui pengaturan kuis.
+     * Hanya guru pemilik kelas induk atau super admin.
      *
      * PUT /api/quizzes/{quiz}
      */
     public function update(Request $request, Quiz $quiz): JsonResponse
     {
+        $this->authorize('update', $quiz);
+
         $validated = $request->validate([
             'title'      => ['sometimes', 'string', 'max:255'],
             'time_limit' => ['sometimes', 'integer', 'min:1', 'max:300'],
@@ -89,11 +96,14 @@ class QuizController extends Controller
 
     /**
      * Hapus kuis (cascade ke questions & attempts).
+     * Hanya guru pemilik kelas induk atau super admin.
      *
      * DELETE /api/quizzes/{quiz}
      */
     public function destroy(Quiz $quiz): JsonResponse
     {
+        $this->authorize('delete', $quiz);
+
         $quiz->delete();
 
         return response()->json([
