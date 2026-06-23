@@ -91,6 +91,9 @@ class EnrollmentController extends Controller
      */
     public function courseStudents(Course $course): JsonResponse
     {
+        // Guru hanya bisa melihat siswa di kelas miliknya sendiri
+        $this->authorize('viewStudents', $course);
+
         $students = $course->students()
             ->select('users.id', 'users.name', 'users.email')
             ->withPivot('enrolled_at')

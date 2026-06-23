@@ -11,6 +11,7 @@ class MaterialController extends Controller
 {
     /**
      * Tampilkan semua materi dalam sebuah modul, diurutkan by order_number.
+     * Semua role yang sudah login bisa mengakses.
      */
     public function index(Module $module): JsonResponse
     {
@@ -24,9 +25,12 @@ class MaterialController extends Controller
 
     /**
      * Tambah materi baru ke dalam sebuah modul.
+     * Hanya guru pemilik kelas induk atau super admin.
      */
     public function store(Request $request, Module $module): JsonResponse
     {
+        $this->authorize('addMaterial', $module);
+
         $validated = $request->validate([
             'title'        => ['required', 'string', 'max:255'],
             'type'         => ['required', 'in:video,pdf,text'],
@@ -46,8 +50,9 @@ class MaterialController extends Controller
 
     /**
      * Tampilkan detail satu materi.
+     * Semua role yang sudah login bisa mengakses.
      */
-    public function show(Module $module, Material $material): JsonResponse
+    public function show(Material $material): JsonResponse
     {
         return response()->json([
             'message' => 'Detail materi berhasil diambil.',
@@ -57,9 +62,12 @@ class MaterialController extends Controller
 
     /**
      * Perbarui data materi.
+     * Hanya guru pemilik kelas induk atau super admin.
      */
-    public function update(Request $request, Module $module, Material $material): JsonResponse
+    public function update(Request $request, Material $material): JsonResponse
     {
+        $this->authorize('update', $material);
+
         $validated = $request->validate([
             'title'        => ['sometimes', 'string', 'max:255'],
             'type'         => ['sometimes', 'in:video,pdf,text'],
@@ -77,9 +85,12 @@ class MaterialController extends Controller
 
     /**
      * Hapus materi.
+     * Hanya guru pemilik kelas induk atau super admin.
      */
-    public function destroy(Module $module, Material $material): JsonResponse
+    public function destroy(Material $material): JsonResponse
     {
+        $this->authorize('delete', $material);
+
         $material->delete();
 
         return response()->json([
