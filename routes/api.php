@@ -1,10 +1,16 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BadgeController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CourseController;
+use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\MaterialController;
 use App\Http\Controllers\ModuleController;
+use App\Http\Controllers\ProgressController;
+use App\Http\Controllers\QuestionController;
+use App\Http\Controllers\QuizAttemptController;
+use App\Http\Controllers\QuizController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -63,4 +69,38 @@ Route::middleware('auth:sanctum')->group(function () {
     // --- Materials (nested dalam Module) ---
     Route::apiResource('courses.modules.materials', MaterialController::class)
         ->shallow();
+
+    // --- Enrollment (Pendaftaran Kelas) ---
+    Route::get('my-courses', [EnrollmentController::class, 'myCourses'])->name('my-courses');
+    Route::post('courses/{course}/enroll', [EnrollmentController::class, 'enroll'])->name('courses.enroll');
+    Route::delete('courses/{course}/enroll', [EnrollmentController::class, 'unenroll'])->name('courses.unenroll');
+    Route::get('courses/{course}/students', [EnrollmentController::class, 'courseStudents'])->name('courses.students');
+
+    // --- Progress Belajar ---
+    Route::get('my-progress', [ProgressController::class, 'myProgress'])->name('my-progress');
+    Route::post('materials/{material}/progress', [ProgressController::class, 'markProgress'])->name('materials.progress');
+    Route::get('courses/{course}/progress', [ProgressController::class, 'courseProgress'])->name('courses.progress');
+
+    // --- Gamifikasi: Quiz ---
+    Route::get('courses/{course}/quizzes', [QuizController::class, 'index'])->name('courses.quizzes.index');
+    Route::post('courses/{course}/quizzes', [QuizController::class, 'store'])->name('courses.quizzes.store');
+    Route::get('quizzes/{quiz}', [QuizController::class, 'show'])->name('quizzes.show');
+    Route::put('quizzes/{quiz}', [QuizController::class, 'update'])->name('quizzes.update');
+    Route::delete('quizzes/{quiz}', [QuizController::class, 'destroy'])->name('quizzes.destroy');
+
+    // --- Gamifikasi: Questions (soal kuis) ---
+    Route::get('quizzes/{quiz}/questions', [QuestionController::class, 'index'])->name('quizzes.questions.index');
+    Route::post('quizzes/{quiz}/questions', [QuestionController::class, 'store'])->name('quizzes.questions.store');
+    Route::get('questions/{question}', [QuestionController::class, 'show'])->name('questions.show');
+    Route::put('questions/{question}', [QuestionController::class, 'update'])->name('questions.update');
+    Route::delete('questions/{question}', [QuestionController::class, 'destroy'])->name('questions.destroy');
+
+    // --- Gamifikasi: Quiz Attempts (submit & riwayat nilai) ---
+    Route::post('quizzes/{quiz}/submit', [QuizAttemptController::class, 'submit'])->name('quizzes.submit');
+    Route::get('quizzes/{quiz}/attempts', [QuizAttemptController::class, 'quizAttempts'])->name('quizzes.attempts');
+    Route::get('my-attempts', [QuizAttemptController::class, 'myAttempts'])->name('my-attempts');
+
+    // --- Gamifikasi: Badges ---
+    Route::apiResource('badges', BadgeController::class);
+    Route::get('my-badges', [BadgeController::class, 'myBadges'])->name('my-badges');
 });

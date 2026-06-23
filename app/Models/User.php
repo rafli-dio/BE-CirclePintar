@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
@@ -103,5 +105,42 @@ class User extends Authenticatable
     public function isStudent(): bool
     {
         return $this->role === self::ROLE_STUDENT;
+    }
+
+    // ─── Relationships ────────────────────────────────────────────────────────────
+
+    /**
+     * Kelas-kelas yang diikuti oleh siswa ini.
+     */
+    public function enrolledCourses(): BelongsToMany
+    {
+        return $this->belongsToMany(Course::class, 'course_student')
+                    ->withPivot('enrolled_at');
+    }
+
+    /**
+     * Progres belajar materi milik siswa ini.
+     */
+    public function materialProgress(): HasMany
+    {
+        return $this->hasMany(MaterialStudent::class);
+    }
+
+    /**
+     * Riwayat semua pengerjaan kuis oleh siswa ini.
+     */
+    public function quizAttempts(): HasMany
+    {
+        return $this->hasMany(QuizAttempt::class);
+    }
+
+    /**
+     * Badge-badge yang telah diraih oleh siswa ini.
+     */
+    public function earnedBadges(): BelongsToMany
+    {
+        return $this->belongsToMany(Badge::class, 'user_badges')
+                    ->withPivot('earned_at')
+                    ->orderByPivot('earned_at', 'desc');
     }
 }
