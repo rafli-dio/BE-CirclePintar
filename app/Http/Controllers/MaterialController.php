@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Course;
 use App\Models\Material;
 use App\Models\Module;
 use Illuminate\Http\JsonResponse;
@@ -25,7 +26,7 @@ class MaterialController extends Controller
      * Tampilkan semua materi dalam sebuah modul, diurutkan by order_number.
      * Semua role yang sudah login bisa mengakses.
      */
-    public function index(Module $module): JsonResponse
+    public function index(Course $course, Module $module): JsonResponse
     {
         $materials = $module->materials()->get();
 
@@ -40,23 +41,16 @@ class MaterialController extends Controller
     /**
      * Tambah materi baru ke dalam sebuah modul.
      * Hanya guru pemilik kelas induk atau super admin.
-<<<<<<< HEAD
      *
      * Mendukung dua mode:
      *  1. Upload PDF  → kirim sebagai multipart/form-data dengan field `file`
      *  2. URL eksternal → kirim JSON dengan field `content_url` (video/text)
-=======
->>>>>>> bd8073d52c4396dbf2501d5e9ffabfe4ef835935
      */
-    public function store(Request $request, Module $module): JsonResponse
+    public function store(Request $request, Course $course, Module $module): JsonResponse
     {
         $this->authorize('addMaterial', $module);
 
-<<<<<<< HEAD
-        $request->validate([
-=======
         $validated = $request->validate([
->>>>>>> bd8073d52c4396dbf2501d5e9ffabfe4ef835935
             'title'        => ['required', 'string', 'max:255'],
             'type'         => ['required', 'in:video,pdf,text'],
             'order_number' => ['required', 'integer', 'min:1'],
@@ -76,9 +70,9 @@ class MaterialController extends Controller
                 'max:2048',
             ],
         ], [
-            'file.required_if'      => 'File PDF wajib diupload untuk tipe materi PDF.',
-            'file.mimes'            => 'File harus berformat PDF.',
-            'file.max'              => 'Ukuran file PDF maksimal 50 MB.',
+            'file.required_if'            => 'File PDF wajib diupload untuk tipe materi PDF.',
+            'file.mimes'                  => 'File harus berformat PDF.',
+            'file.max'                    => 'Ukuran file PDF maksimal 50 MB.',
             'content_url.required_unless' => 'URL konten wajib diisi untuk tipe materi video atau text.',
         ]);
 
@@ -86,12 +80,12 @@ class MaterialController extends Controller
         [$contentUrl, $disk] = $this->resolveContent($request);
 
         $material = Material::create([
-            'module_id'   => $module->id,
-            'title'       => $request->title,
-            'type'        => $request->type,
-            'content_url' => $contentUrl,
-            'disk'        => $disk,
-            'order_number'=> $request->order_number,
+            'module_id'    => $module->id,
+            'title'        => $validated['title'],
+            'type'         => $validated['type'],
+            'content_url'  => $contentUrl,
+            'disk'         => $disk,
+            'order_number' => $validated['order_number'],
         ]);
 
         return response()->json([
@@ -119,22 +113,15 @@ class MaterialController extends Controller
     /**
      * Perbarui data materi.
      * Hanya guru pemilik kelas induk atau super admin.
-<<<<<<< HEAD
      *
      * Jika request mengandung file PDF baru → hapus file lama, upload baru.
      * Jika tidak ada file → hanya update metadata (title, order_number, dsb.).
-=======
->>>>>>> bd8073d52c4396dbf2501d5e9ffabfe4ef835935
      */
     public function update(Request $request, Material $material): JsonResponse
     {
         $this->authorize('update', $material);
 
-<<<<<<< HEAD
         $request->validate([
-=======
-        $validated = $request->validate([
->>>>>>> bd8073d52c4396dbf2501d5e9ffabfe4ef835935
             'title'        => ['sometimes', 'string', 'max:255'],
             'type'         => ['sometimes', 'in:video,pdf,text'],
             'order_number' => ['sometimes', 'integer', 'min:1'],
@@ -164,6 +151,7 @@ class MaterialController extends Controller
 
             $updateData['content_url'] = $this->uploadPdf($request);
             $updateData['disk']        = Material::DISK_LOCAL;
+
         } elseif ($request->filled('content_url')) {
             // Ganti ke URL eksternal — hapus file lokal lama jika ada
             if ($material->disk === Material::DISK_LOCAL) {
@@ -188,14 +176,9 @@ class MaterialController extends Controller
     // ─── Destroy ──────────────────────────────────────────────────────────────────
 
     /**
-<<<<<<< HEAD
      * Hapus materi beserta file-nya dari storage (jika ada).
      * Hanya guru pemilik kelas induk atau super admin.
      * File dihapus otomatis oleh event `deleting` di Model.
-=======
-     * Hapus materi.
-     * Hanya guru pemilik kelas induk atau super admin.
->>>>>>> bd8073d52c4396dbf2501d5e9ffabfe4ef835935
      */
     public function destroy(Material $material): JsonResponse
     {

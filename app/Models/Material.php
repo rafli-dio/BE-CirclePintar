@@ -58,7 +58,11 @@ class Material extends Model
     protected function contentUrl(): \Illuminate\Database\Eloquent\Casts\Attribute
     {
         return \Illuminate\Database\Eloquent\Casts\Attribute::make(
-            get: function (string $value) {
+            get: function (?string $value) {
+                if ($value === null) {
+                    return null;
+                }
+
                 if ($this->disk === self::DISK_LOCAL) {
                     return Storage::disk('public')->url($value);
                 }
