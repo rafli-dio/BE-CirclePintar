@@ -36,9 +36,10 @@ class QuizAttemptController extends Controller
         ]);
 
         // Ambil semua soal kuis beserta kunci jawaban
+        // makeVisible() harus dipanggil di collection (setelah get()), bukan di query builder
         $questions = $quiz->questions()
-            ->makeVisible('correct_key')  // izinkan akses correct_key untuk penilaian
             ->get()
+            ->makeVisible('correct_key')  // izinkan akses correct_key untuk penilaian
             ->keyBy('id');
 
         $totalQuestions = $questions->count();

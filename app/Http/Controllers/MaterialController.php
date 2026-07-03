@@ -116,12 +116,20 @@ class MaterialController extends Controller
      *
      * Jika request mengandung file PDF baru → hapus file lama, upload baru.
      * Jika tidak ada file → hanya update metadata (title, order_number, dsb.).
+     *
+     * PENTING (PHP Limitation):
+     * PHP tidak bisa membaca body multipart/form-data pada request PUT/PATCH.
+     * Gunakan method spoofing dari frontend:
+     *   - Kirim sebagai POST multipart/form-data
+     *   - Tambahkan field `_method = PUT` di body
+     * Atau kirim sebagai JSON (tanpa upload file) langsung via PUT.
      */
     public function update(Request $request, Material $material): JsonResponse
     {
         $this->authorize('update', $material);
 
-        $request->validate([
+        // FIX: Simpan hasil validate() ke $validated agar data sudah ter-sanitasi
+        $validated = $request->validate([
             'title'        => ['sometimes', 'string', 'max:255'],
             'type'         => ['sometimes', 'in:video,pdf,text'],
             'order_number' => ['sometimes', 'integer', 'min:1'],
@@ -137,7 +145,11 @@ class MaterialController extends Controller
             'file.max'   => 'Ukuran file PDF maksimal 50 MB.',
         ]);
 
-        $updateData = $request->only(['title', 'type', 'order_number']);
+        // FIX: Gunakan $validated (bukan $request->only()) untuk keamanan & konsistensi
+        $updateData = array_filter(
+            array_intersect_key($validated, array_flip(['title', 'type', 'order_number'])),
+            fn($value) => $value !== null
+        );
 
         // Jika ada file PDF baru yang diupload
         if ($request->hasFile('file') && $request->file('file')->isValid()) {
@@ -152,7 +164,8 @@ class MaterialController extends Controller
             $updateData['content_url'] = $this->uploadPdf($request);
             $updateData['disk']        = Material::DISK_LOCAL;
 
-        } elseif ($request->filled('content_url')) {
+        } elseif (array_key_exists('content_url', $validated) && $validated['content_url'] !== null) {
+            // FIX: Gunakan $validated['content_url'] bukan $request->content_url
             // Ganti ke URL eksternal — hapus file lokal lama jika ada
             if ($material->disk === Material::DISK_LOCAL) {
                 $oldPath = $material->getRawOriginal('content_url');
@@ -161,7 +174,7 @@ class MaterialController extends Controller
                 }
             }
 
-            $updateData['content_url'] = $request->content_url;
+            $updateData['content_url'] = $validated['content_url'];
             $updateData['disk']        = Material::DISK_EXTERNAL;
         }
 

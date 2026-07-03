@@ -96,9 +96,17 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // GET modules (baca oleh semua login — dipindah ke All Roles)
         // Materials — nested di module (shallow)
+        // PUT  /api/materials/{material}        → update via JSON (tanpa file upload)
+        // POST /api/materials/{material}        → update via multipart/form-data + _method=PUT
+        //      (diperlukan karena PHP tidak bisa baca multipart body pada PUT/PATCH)
         Route::apiResource('courses.modules.materials', MaterialController::class)
             ->except(['index', 'show'])
             ->shallow();
+
+        // FIX: Route alternatif POST untuk update material dengan file upload (method spoofing)
+        // Cara penggunaan: kirim POST multipart/form-data + field `_method = PUT` di body
+        Route::post('materials/{material}', [MaterialController::class, 'update'])
+            ->name('materials.update.post');
 
         // List siswa per kelas
         Route::get('courses/{course}/students', [EnrollmentController::class, 'courseStudents'])
