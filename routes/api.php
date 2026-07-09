@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BadgeController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\EnrollmentController;
@@ -11,6 +12,7 @@ use App\Http\Controllers\ProgressController;
 use App\Http\Controllers\QuestionController;
 use App\Http\Controllers\QuizAttemptController;
 use App\Http\Controllers\QuizController;
+use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -76,6 +78,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('badges',            [BadgeController::class, 'index'])->name('badges.index');
     Route::get('badges/{badge}',    [BadgeController::class, 'show'])->name('badges.show');
 
+    // ── [Super Admin Only] Kelola Sistem & Pengguna ──────────────────────────
+    Route::middleware('role:super_admin')->group(function () {
+        Route::apiResource('users', UserController::class);
+    });
+
     // ── [Admin + Teacher] Kelola konten ──────────────────────────────────────
     Route::middleware('role:super_admin,teacher')->group(function () {
 
@@ -107,6 +114,9 @@ Route::middleware('auth:sanctum')->group(function () {
         // Cara penggunaan: kirim POST multipart/form-data + field `_method = PUT` di body
         Route::post('materials/{material}', [MaterialController::class, 'update'])
             ->name('materials.update.post');
+
+        // Dashboard Stats
+        Route::get('dashboard/stats', [DashboardController::class, 'stats']);
 
         // List siswa per kelas
         Route::get('courses/{course}/students', [EnrollmentController::class, 'courseStudents'])
