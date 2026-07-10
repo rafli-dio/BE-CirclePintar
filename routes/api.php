@@ -101,7 +101,6 @@ Route::middleware('auth:sanctum')->group(function () {
             ->except(['index', 'show'])
             ->shallow();
 
-        // GET modules (baca oleh semua login — dipindah ke All Roles)
         // Materials — nested di module (shallow)
         // PUT  /api/materials/{material}        → update via JSON (tanpa file upload)
         // POST /api/materials/{material}        → update via multipart/form-data + _method=PUT
@@ -109,6 +108,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('courses.modules.materials', MaterialController::class)
             ->except(['index', 'show'])
             ->shallow();
+
+        // Shallow store: POST /api/modules/{module}/materials
+        // Digunakan frontend agar tidak perlu tahu course_id saat menambah materi
+        Route::post('modules/{module}/materials', [MaterialController::class, 'storeShallow'])
+            ->name('modules.materials.store');
 
         // FIX: Route alternatif POST untuk update material dengan file upload (method spoofing)
         // Cara penggunaan: kirim POST multipart/form-data + field `_method = PUT` di body

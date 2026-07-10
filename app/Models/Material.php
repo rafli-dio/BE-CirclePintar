@@ -33,6 +33,7 @@ class Material extends Model
         'title',
         'type',
         'content_url',
+        'content_body',
         'disk',
         'order_number',
     ];

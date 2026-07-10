@@ -25,10 +25,11 @@ class MaterialController extends Controller
     /**
      * Tampilkan semua materi dalam sebuah modul, diurutkan by order_number.
      * Semua role yang sudah login bisa mengakses.
+     * content_url sudah otomatis dikonversi ke URL publik oleh Accessor di Model.
      */
     public function index(Course $course, Module $module): JsonResponse
     {
-        $materials = $module->materials()->get();
+        $materials = $module->materials()->orderBy('order_number')->get();
 
         return response()->json([
             'message' => 'Daftar materi berhasil diambil.',
@@ -45,6 +46,9 @@ class MaterialController extends Controller
      * Mendukung dua mode:
      *  1. Upload PDF  → kirim sebagai multipart/form-data dengan field `file`
      *  2. URL eksternal → kirim JSON dengan field `content_url` (video/text)
+     *
+     * Catatan: content_url di response sudah berupa URL publik lengkap
+     * berkat Accessor di Material Model.
      */
     public function store(Request $request, Course $course, Module $module): JsonResponse
     {
@@ -55,7 +59,7 @@ class MaterialController extends Controller
             'type'         => ['required', 'in:video,pdf,text'],
             'order_number' => ['required', 'integer', 'min:1'],
 
-            // Salah satu wajib ada: file upload ATAU content_url
+            // Upload file PDF
             'file'         => [
                 'required_if:type,pdf',
                 'nullable',
@@ -63,17 +67,21 @@ class MaterialController extends Controller
                 'mimes:pdf',
                 'max:' . self::PDF_MAX_KB,
             ],
+            // URL eksternal (video/artikel)
             'content_url'  => [
-                'required_unless:type,pdf',
                 'nullable',
                 'string',
                 'max:2048',
             ],
+            // Konten teks panjang langsung (tipe text)
+            'content_body' => [
+                'nullable',
+                'string',
+            ],
         ], [
-            'file.required_if'            => 'File PDF wajib diupload untuk tipe materi PDF.',
-            'file.mimes'                  => 'File harus berformat PDF.',
-            'file.max'                    => 'Ukuran file PDF maksimal 50 MB.',
-            'content_url.required_unless' => 'URL konten wajib diisi untuk tipe materi video atau text.',
+            'file.required_if'  => 'File PDF wajib diupload untuk tipe materi PDF.',
+            'file.mimes'        => 'File harus berformat PDF.',
+            'file.max'          => 'Ukuran file PDF maksimal 50 MB.',
         ]);
 
         // Pilih antara upload file atau URL eksternal
@@ -84,13 +92,64 @@ class MaterialController extends Controller
             'title'        => $validated['title'],
             'type'         => $validated['type'],
             'content_url'  => $contentUrl,
+            'content_body' => $validated['content_body'] ?? null,
+            'disk'         => $disk,
+            'order_number' => $validated['order_number'],
+        ]);
+
+        // fresh() memastikan accessor content_url dijalankan ulang
+        // sehingga response berisi URL publik lengkap (bukan path relatif)
+        return response()->json([
+            'message' => 'Materi berhasil ditambahkan.',
+            'data'    => $material->fresh(),
+        ], 201);
+    }
+
+    // ─── Store Shallow ────────────────────────────────────────────────────────────
+
+    /**
+     * Versi shallow dari store: POST /api/modules/{module}/materials
+     * Tidak memerlukan course sebagai parent di URL.
+     * Digunakan oleh frontend Teacher Panel agar lebih sederhana.
+     */
+    public function storeShallow(Request $request, Module $module): JsonResponse
+    {
+        $this->authorize('addMaterial', $module);
+
+        $validated = $request->validate([
+            'title'        => ['required', 'string', 'max:255'],
+            'type'         => ['required', 'in:video,pdf,text'],
+            'order_number' => ['required', 'integer', 'min:1'],
+            'file'         => [
+                'required_if:type,pdf',
+                'nullable',
+                'file',
+                'mimes:pdf',
+                'max:' . self::PDF_MAX_KB,
+            ],
+            'content_url'  => ['nullable', 'string', 'max:2048'],
+            'content_body' => ['nullable', 'string'],
+        ], [
+            'file.required_if' => 'File PDF wajib diupload untuk tipe materi PDF.',
+            'file.mimes'       => 'File harus berformat PDF.',
+            'file.max'         => 'Ukuran file PDF maksimal 50 MB.',
+        ]);
+
+        [$contentUrl, $disk] = $this->resolveContent($request);
+
+        $material = Material::create([
+            'module_id'    => $module->id,
+            'title'        => $validated['title'],
+            'type'         => $validated['type'],
+            'content_url'  => $contentUrl,
+            'content_body' => $validated['content_body'] ?? null,
             'disk'         => $disk,
             'order_number' => $validated['order_number'],
         ]);
 
         return response()->json([
             'message' => 'Materi berhasil ditambahkan.',
-            'data'    => $material,
+            'data'    => $material->fresh(),
         ], 201);
     }
 
@@ -98,7 +157,7 @@ class MaterialController extends Controller
 
     /**
      * Tampilkan detail satu materi.
-     * Semua role yang sudah login bisa mengakses.
+     * content_url sudah berupa URL publik lengkap via Accessor.
      */
     public function show(Material $material): JsonResponse
     {
@@ -128,26 +187,23 @@ class MaterialController extends Controller
     {
         $this->authorize('update', $material);
 
-        // FIX: Simpan hasil validate() ke $validated agar data sudah ter-sanitasi
         $validated = $request->validate([
             'title'        => ['sometimes', 'string', 'max:255'],
             'type'         => ['sometimes', 'in:video,pdf,text'],
             'order_number' => ['sometimes', 'integer', 'min:1'],
             'file'         => [
-                'nullable',
-                'file',
-                'mimes:pdf',
+                'nullable', 'file', 'mimes:pdf',
                 'max:' . self::PDF_MAX_KB,
             ],
             'content_url'  => ['nullable', 'string', 'max:2048'],
+            'content_body' => ['nullable', 'string'],
         ], [
             'file.mimes' => 'File harus berformat PDF.',
             'file.max'   => 'Ukuran file PDF maksimal 50 MB.',
         ]);
 
-        // FIX: Gunakan $validated (bukan $request->only()) untuk keamanan & konsistensi
         $updateData = array_filter(
-            array_intersect_key($validated, array_flip(['title', 'type', 'order_number'])),
+            array_intersect_key($validated, array_flip(['title', 'type', 'order_number', 'content_body'])),
             fn($value) => $value !== null
         );
 
@@ -165,7 +221,6 @@ class MaterialController extends Controller
             $updateData['disk']        = Material::DISK_LOCAL;
 
         } elseif (array_key_exists('content_url', $validated) && $validated['content_url'] !== null) {
-            // FIX: Gunakan $validated['content_url'] bukan $request->content_url
             // Ganti ke URL eksternal — hapus file lokal lama jika ada
             if ($material->disk === Material::DISK_LOCAL) {
                 $oldPath = $material->getRawOriginal('content_url');
@@ -180,6 +235,7 @@ class MaterialController extends Controller
 
         $material->update($updateData);
 
+        // fresh() memastikan accessor content_url dijalankan ulang
         return response()->json([
             'message' => 'Materi berhasil diperbarui.',
             'data'    => $material->fresh(),
